@@ -9,13 +9,15 @@ router = APIRouter()
 
 @router.post("/convert-text-to-pdf")
 async def convert_text2pdf(
-    request: model_type.TextToPDFRequest = Depends()
+    lesson_plan: str = Form(..., description="Lesson plan as a JSON-formatted string."),
+    output_file_name: str = Form(..., description="Name of the output DOCX file.")
 ):
     try:
         # Pass the request to the controller
-        retrieved_data = await controller.convert_text2pdf(request)
+        lesson_plan_json = json.loads(lesson_plan)
+        retrieved_data = await controller.convert_text2pdf(lesson_plan_json,output_file_name)
         message = "Text converted to PDF successfully"
-        return FileResponse(path=retrieved_data, media_type='application/pdf', filename=f"{request.output_file_name}.pdf")
+        return FileResponse(path=retrieved_data, media_type='application/pdf', filename=f"{output_file_name}.pdf")
         
     except Exception as e:
         return {
@@ -26,13 +28,15 @@ async def convert_text2pdf(
 
 @router.post("/convert-text-to-docx")
 async def convert_text2docx(
-    request: model_type.TextToDocxRequest = Depends()
+    lesson_plan: str = Form(..., description="Lesson plan as a JSON-formatted string."),
+    output_file_name: str = Form(..., description="Name of the output DOCX file.")
 ):
     try:
         # Pass the request to the controller
-        retrieved_data = await controller.convert_text2docx(request)
+        lesson_plan_json = json.loads(lesson_plan)
+        retrieved_data = await controller.convert_text2docx(lesson_plan_json,output_file_name)
         message = "Text converted to DOCX successfully"
-        return FileResponse(path=retrieved_data, media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename=f"{request.output_file_name}.docx")
+        return FileResponse(path=retrieved_data, media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename=f"{output_file_name}.docx")
         
     except Exception as e:
         return {

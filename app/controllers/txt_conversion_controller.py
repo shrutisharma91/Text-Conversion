@@ -4,13 +4,13 @@ import app.utils.conversion.word as word
 import app.utils.conversion.ppt as ppt
 import os
 
-async def convert_text2pdf(request: model_type.TextToPDFRequest):
+async def convert_text2pdf(lesson_plan_json,output_file_name):
     """
     Converts the given text into a PDF and saves it to the specified file name.
     """
     try:
         # Pass the 'request' directly to the utility function
-        file_path = await pdf.convert_text_to_pdf(request)  # Pass the entire request object
+        file_path = await pdf.convert_text_to_pdf(lesson_plan_json,output_file_name)  # Pass the entire request object
 
         # Return the path to the generated PDF
         return file_path
@@ -20,13 +20,13 @@ async def convert_text2pdf(request: model_type.TextToPDFRequest):
 
 
 
-async def convert_text2docx(request: model_type.TextToDocxRequest):
+async def convert_text2docx(lesson_plan_json,output_file_name):
     """
     Converts the given text into a DOCX and saves it to the specified file name.
     """
     try:
         # Pass the 'request' directly to the utility function
-        file_path = await word.convert_text2docx(request)  # Pass the entire request object
+        file_path = await word.convert_text2docx(lesson_plan_json,output_file_name)  # Pass the entire request object
 
         # Return the path to the generated DOCX
         return file_path

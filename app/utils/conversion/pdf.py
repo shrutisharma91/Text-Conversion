@@ -1,7 +1,12 @@
 from fpdf import FPDF
 import json
 
-# Create a PDF class
+def skip_unsupported_characters(text: str) -> str:
+    """
+    Removes (skips) all characters outside Windows-1252 (0–255).
+    """
+    return "".join(ch for ch in text if ord(ch) <= 255)
+
 class PDF(FPDF):
     def __init__(self):
         super().__init__()
@@ -9,94 +14,82 @@ class PDF(FPDF):
         self.set_right_margin(10)
 
     def header(self):
+        # Use built-in font that only supports 0–255 range
         self.set_font('Arial', 'B', 16)
-        self.cell(0, 10, 'Lesson Plan', ln=True, align='C')
+        header_text = "Lesson Plan"
+        # Skip unsupported chars if any (unlikely here)
+        header_text = skip_unsupported_characters(header_text)
+        self.cell(0, 10, header_text, ln=True, align='C')
         self.ln(10)
 
     def chapter_title(self, title):
         self.set_font('Arial', 'B', 14)
+        # Skip unsupported characters
+        title = skip_unsupported_characters(title)
         self.cell(0, 10, title, ln=True, align='L')
         self.ln(5)
 
     def chapter_body(self, body):
         self.set_font('Arial', '', 12)
+        # Skip unsupported characters
+        body = skip_unsupported_characters(body)
         self.multi_cell(0, 10, body)
         self.ln()
 
-# Helper function to format nested content
 def format_content(data, indent=0):
+    """
+    Recursively formats dict/list/string into a readable text block,
+    skipping characters outside 0–255.
+    """
     if isinstance(data, dict):
         formatted = ""
         for key, value in data.items():
-            formatted += " " * indent + f"{key.replace('_', ' ')}:\n"
-            formatted += format_content(value, indent + 4)  # Indent nested dictionaries
+            # Replace underscores, skip unsupported chars
+            key_text = key.replace("_", " ")
+            key_text = skip_unsupported_characters(key_text)
+            
+            formatted += " " * indent + f"{key_text}:\n"
+            formatted += format_content(value, indent + 4)
         return formatted
+
     elif isinstance(data, list):
         formatted = ""
         for item in data:
-            formatted += " " * indent + f"- {item}\n"  # Format list items with a leading dash
+            # Convert item to string and skip unsupported chars
+            item_str = skip_unsupported_characters(str(item))
+            formatted += " " * indent + f"- {item_str}\n"
         return formatted
+
     else:
-        return " " * indent + str(data)  # Return string if it's not a dict or list
+        data_str = skip_unsupported_characters(str(data))
+        return " " * indent + data_str + "\n"
 
-import json
-import ast
-
-def convert_to_json(q_string):
-    """
-    Converts a Swagger string input into a valid JSON dictionary.
-    Handles cases where single quotes are used instead of double quotes.
-    """
+async def convert_text_to_pdf(lesson_plan_json, output_file_name):
     try:
-        # Try parsing directly with json.loads()
-        return json.loads(q_string)
-    except json.JSONDecodeError:
-        print("⚠️ JSONDecodeError: Trying to clean the input...")
-        
-        # Clean up the string: Replace single quotes with double quotes
-        cleaned_str = q_string.strip().replace("'", '"')
-        
-        try:
-            # Try again using json.loads()
-            return json.loads(cleaned_str)
-        except json.JSONDecodeError:
-            print("⚠️ Still failing. Trying ast.literal_eval...")
-            try:
-                # Use ast.literal_eval() as a last resort
-                return ast.literal_eval(q_string.strip())
-            except (SyntaxError, ValueError) as e:
-                print("❌ Failed to parse JSON string:", e)
-                return None  # Return None if all methods fail
-
-# Helper function to convert the input request data into a PDF
-async def convert_text_to_pdf(request):
-    try:
-        # Convert the JSON string to a Python dictionary
-        #lesson_plan_data = json.loads(request.lesson_plan_data)
-        lesson_plan_data =convert_to_json(request.lesson_plan_data) 
-        print(type(lesson_plan_data))
-        print(lesson_plan_data)
-
-        # Initialize the PDF object
         pdf = PDF()
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
 
-        # Generate the PDF content
-        for lesson in lesson_plan_data:
-            # Add lesson topic as a chapter
+        lessons = lesson_plan_json.get("lesson_plan", [])
+
+        for lesson in lessons:
+            # Lesson Topic
             lesson_topic = lesson.get("Lesson_Topic", "")
-            pdf.chapter_title(f"Lesson Topic: {lesson_topic}")
+            if lesson_topic:
+                pdf.chapter_title(f"Lesson Topic: {lesson_topic}")
 
-            # Add the remaining details of the lesson
+            # Other Keys
             for key, value in lesson.items():
-                if key != "Lesson_Topic":  # Skip the Lesson_Topic as it is already added
-                    pdf.chapter_title(key.replace("_", " "))  # Add the key as a title
-                    formatted_content = format_content(value)  # Add the value as the body
-                    pdf.chapter_body(formatted_content)  # Add formatted body text
+                if key == "Lesson_Topic":
+                    continue
+                sanitized_key = skip_unsupported_characters(key.replace("_", " "))
+                pdf.chapter_title(sanitized_key)
 
-        # Save the PDF
-        file_path = f"generated_files/{request.output_file_name}.pdf"
+                # Format and skip unsupported chars in the value
+                formatted_content = format_content(value)
+                pdf.chapter_body(formatted_content)
+
+        file_path = f"generated_files/{output_file_name}.pdf"
         pdf.output(file_path)
 
         return file_path
